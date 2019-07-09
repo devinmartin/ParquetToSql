@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Parquet;
+using Parquet.Data;
 using ParquetToSql.Tests.ParquetSamples;
 using System;
 using System.Collections.Generic;
@@ -19,7 +20,7 @@ namespace ParquetToSql.Tests
             int rowCount = 0;
 
             // act
-            MetadataReadTest(reader =>
+            ReadTest(reader =>
             {
                 while (reader.Read())
                 {
@@ -39,7 +40,7 @@ namespace ParquetToSql.Tests
             string column2Name = null;
 
             // act
-            MetadataReadTest(reader =>
+            ReadTest(reader =>
             {
                 column1Name = reader.GetName(0);
                 column2Name = reader.GetName(1);
@@ -58,7 +59,7 @@ namespace ParquetToSql.Tests
             var column2Data = new List<string>();
 
             // act
-            ReadTest(reader =>
+            ReadDataTest(reader =>
             {
                 column1Data.Add(reader.GetInt32(0));
                 column2Data.Add(reader.GetString(1));
@@ -107,7 +108,7 @@ namespace ParquetToSql.Tests
             var converters = new[] { new ColumnConverter { ColumnName = nameof(TwoColumn.Column2), Converter = _ => ((string)_).Length } };
 
             // act
-            ReadTest(reader =>
+            ReadDataTest(reader =>
             {
                 column1Data.Add(reader.GetInt32(0));
 
@@ -147,21 +148,57 @@ namespace ParquetToSql.Tests
                         }).Select(_ => _.Length));
         }
 
+        [TestMethod]
+        public void ReadSingleColumnData()
+        {
+            // arrange
+            var column2Data = new List<string>();
+            int numberOfColumns = 0;
+            // act
+            ReadTest(reader =>
+            {
+                
+                while (reader.Read())
+                {
+                    numberOfColumns = reader.FieldCount;
+                    column2Data.Add(reader.GetString(0));
+                }
+            }, new DataField(nameof(TwoColumn.Column2), typeof(string)));
 
-        private void MetadataReadTest(Action<IDataReader> test)
+            // assert
+            numberOfColumns.Should().Be(1);
+            column2Data.Should().Equal(new[] {
+                        "one",
+                        "two",
+                        "three",
+                        "four",
+                        "five",
+                        "six",
+                        "seven",
+                        "eight",
+                        "nine",
+                        "ten",
+                        "eleven",
+                        "twelve"
+                        });
+
+        }
+
+
+        private void ReadTest(Action<IDataReader> test, params DataField[] dataFields)
         {
             using (var stream = ParquetFiles.GetParquetFileWithThreeRowGroups())
             {
                 using (var parquetReader = new ParquetReader(stream))
                 {
-                    using (IDataReader reader = new ParquetDataReader(parquetReader))
+                    using (IDataReader reader = (dataFields?.Length > 0) ? new ParquetDataReader(parquetReader, dataFields, null) : new ParquetDataReader(parquetReader))
                     {
                         test(reader);
                     }
                 }
             }
         }
-        private void ReadTest(Action<IDataReader> test, IEnumerable<ColumnConverter> columnConverters = null)
+        private void ReadDataTest(Action<IDataReader> test, IEnumerable<ColumnConverter> columnConverters = null)
         {
             using (var stream = ParquetFiles.GetParquetFileWithThreeRowGroups())
             {

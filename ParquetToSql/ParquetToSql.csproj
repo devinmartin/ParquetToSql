@@ -3,11 +3,12 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Description>ParquetToSql is a super simple and lightweight IDataReader that will read over the data in a parquet file. It uses the fabulous Parquet.Net library to do all the hard work.</Description>
+    <Description>ParquetToSql is a super simple and lightweight IDataReader that will read over the data in a parquet file. It was written specifically to bulk load a parquet file into a sql table.</Description>
     <PackageProjectUrl>https://github.com/devinmartin/ParquetToSql</PackageProjectUrl>
     <Copyright>Devin Martin</Copyright>
     <PackageLicenseUrl>https://github.com/devinmartin/ParquetToSql/blob/master/LICENSE</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/devinmartin/ParquetToSql</RepositoryUrl>
+    <PackageVersion>1.0.0</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
