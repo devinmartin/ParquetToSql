@@ -13,7 +13,7 @@ namespace ParquetToSql
     public class ParquetDataReader : IDataReader
     {
         private readonly ParquetReader _parquetReader;
-
+        private readonly Lazy<List<Func<object, object>>> _columnConverters;
         private readonly int _rowGroupCount;
         private int _rowGroupIndex;
         private long _rowIndex;
@@ -23,17 +23,37 @@ namespace ParquetToSql
         private bool _closed = false;
 
         private List<DataField> _fields;
-
         private List<Parquet.Data.DataColumn> _columns;
 
-        public ParquetDataReader(ParquetReader parquetReader, IEnumerable<DataField> fields)
+        public ParquetDataReader(ParquetReader parquetReader, IEnumerable<DataField> fields, IEnumerable<ColumnConverter> columnConverters)
         {
             _parquetReader = parquetReader ?? throw new ArgumentNullException(nameof(parquetReader));
             _fields = fields?.ToList() ?? throw new ArgumentNullException(nameof(fields));
             _rowGroupCount = parquetReader.RowGroupCount;
+            _columnConverters = new Lazy<List<Func<object, object>>>(() => InitializeColumnConverters(columnConverters), true);
         }
 
-        public ParquetDataReader(ParquetReader parquetReader) : this(parquetReader, parquetReader?.Schema?.GetDataFields()) { }
+        private List<Func<object, object>> InitializeColumnConverters(IEnumerable<ColumnConverter> columnConverters)
+        {
+            var list = new List<Func<object, object>>();
+            foreach (var field in _fields)
+            {
+                var converter = columnConverters?.FirstOrDefault(_ => field.Name != null && _.ColumnName == field.Name);
+                if (converter?.Converter != null)
+                {
+                    list.Add(converter.Converter);
+                }
+                else
+                {
+                    list.Add(_ => _);
+                }
+            }
+            return list;
+        }
+
+        public ParquetDataReader(ParquetReader parquetReader) : this(parquetReader, parquetReader?.Schema?.GetDataFields(), null) { }
+
+        public ParquetDataReader(ParquetReader parquetReader, IEnumerable<ColumnConverter> columnConverters) : this(parquetReader, parquetReader?.Schema?.GetDataFields(), columnConverters) { }
 
         object IDataRecord.this[int i] => Get(i);
 
@@ -203,10 +223,15 @@ namespace ParquetToSql
             if (_opened && !_closed)
             {
                 var column = _columns[i];
-                if (column == null)
-                    return null;
-                else
-                    return column.Data.GetValue(_rowIndex);
+                var converter = _columnConverters.Value[i];
+
+                return converter(new Func<object>(() =>
+                {
+                    if (column == null)
+                        return null;
+                    else
+                        return column.Data.GetValue(_rowIndex);
+                })());
             }
             else
             {
